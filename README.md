@@ -29,7 +29,7 @@ The accompanying ipv4 and ipv6 text files contain the redundant servers of notab
 * Verisign
 * Yandex 
 
-13 default domain names are tested, with many others available as toggleable in the code, or simply add your own:
+13 default domain names are tested, with many others available as toggleable in the accompanying text files, or simply add your own:
 
 * docker.io
 * github.com
