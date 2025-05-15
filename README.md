@@ -231,6 +231,7 @@ The accompanying ipv4 and ipv6 text file contain the redundant servers of notabl
     AlternateDNS/2   *   *   *   *   *   *   *   *   *   *   *   *   *    NR 13-to
     Comodo/1         *   *   *   *   *   *   *   *   *   *   *   *   *    NR 13-to
     Comodo/2         *   *   *   *   *   *   *   *   *   *   *   *   *    NR 13-to
+
     
     RESPONDING PROVIDERS BY AVERAGED MEDIAN RESPONSE TIMES
     
