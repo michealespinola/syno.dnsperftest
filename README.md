@@ -2,7 +2,7 @@
 
 Shell script to test the performance of the most popular DNS resolvers from your location.
 
-Includes the redundant servers of notable DNS providers by default:
+The accompanying ipv4 and ipv6 text file contain the redundant servers of notable DNS providers by default, including:
 
 * AdGuard
 * CleanBrowsing 
@@ -16,7 +16,7 @@ Includes the redundant servers of notable DNS providers by default:
 * OracleDyn
 * Quad9 (aka 9.9.9.9)
 
-As well as the redundant servers of these other well-known providers:
+...as well as the redundant servers of these other well-known providers:
 
 * AlternateDNS
 * ControlD
@@ -29,7 +29,7 @@ As well as the redundant servers of these other well-known providers:
 * Verisign
 * Yandex 
 
-13 default domain names are tested, with many others available as toggleable in the code:
+13 default domain names are tested, with many others available as toggleable in the code, or simply add your own:
 
 * docker.io
 * github.com
@@ -45,15 +45,22 @@ As well as the redundant servers of these other well-known providers:
 * www.yahoo.com
 * www.youtube.com
 
-# Required 
+# Requirements 
 
-* `dig` needs to be in the PATH.
-* `bc` is no longer a requirement of this script since being forked. `awk` is used instead for greater wide-spread availability.
+* `dig` needs to be in the PATH. If you don't have it, the script will provide instructions for where to get it.
+* `bc` is no longer a requirement of this script since being forked. `awk` is used instead for greater wide-spread availability - particularly for Synology.
 
 # Utilization and example output:
 
-    #bash dnstest.sh
+    # bash dnsreload.sh && bash dnstest.sh
 
+    CHECKING FOR LOCAL DNS SERVER AND FLUSHING CACHE
+    
+          Local DNS: tcp/53 pihole-FTL (pid:31093)
+               Type: docker (pihole)
+             Action: Reloading Pi-hole DNS (pihole-FTL)
+    
+    
     TESTING DOMAINS (dnstest.domains.txt)
     
        Test# Domain Name
