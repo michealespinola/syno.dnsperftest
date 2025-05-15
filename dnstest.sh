@@ -1,206 +1,99 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2034,SC2207
+# shellcheck disable=SC2034
 # shellcheck source=/dev/null
 # bash /volume1/homes/admin/scripts/bash/dnstest.sh
 
+# PARSE COMMAND-LINE OPTIONS (FUTURE OPTIONS)
+while getopts "::" opt; do
+  case ${opt} in
+  \?)
+    echo "Usage: $0"
+    exit 1
+    ;;
+  esac
+done
+shift $((OPTIND - 1))
+
 # CHECK FOR DIG REQUIREMENT
-if ! command -v dig &> /dev/null; then
-  echo
-  echo "* DIG (Domain Information Gopher) is required for DNS queries, but"
-  echo "  is not found in the PATH. Please install it."
-  echo
+if ! command -v dig &>/dev/null; then
+  printf "\n"
+  printf "* DIG (Domain Information Gopher) is required for DNS queries,\n"
+  printf "  but is not found in the PATH. Please install it.\n"
+  printf "\n"
   if [ -e "/proc/sys/kernel/syno_hw_version" ]; then
-    echo "  DIG can be installed as a part of the 'SynoCli Network Tools'"
-    echo "  package. This can be installed via the DSM Package Center by"
-    echo "  adding the 'SynoCommunity' Package Source site, located at:"
-    echo
-    echo "  https://packages.synocommunity.com/"
+    printf "  DIG can be installed as a part of the 'SynoCli Network Tools'\n"
+    printf "  package. This can be installed via the DSM Package Center by\n"
+    printf "  adding the 'SynoCommunity' Package Source site, located at:\n"
+    printf "\n"
+    printf "     https://packages.synocommunity.com/\n"
   else
-    echo "  DIG can typically be installed as a part of the 'dnsutils'"
-    echo "  or 'bind-utils' packages. These can be installed via your"
-    echo "  package management system."
+    printf "  DIG can typically be installed as a part of the 'dnsutils' or\n"
+    printf "  'bind-utils' packages. These can be installed via your\n"
+    printf "  package management system.\n"
   fi
-    echo
-    echo Exiting...
-    echo
-exit 1
+  printf "\n"
+  printf "Exiting...\n"
+  printf "\n"
+  exit 1
 fi
 
 # SCRAPE SCRIPT PATH INFO
-SrceFllPth=$(readlink -f "${BASH_SOURCE[0]}")
-SrceFolder=$(dirname "$SrceFllPth")
-SrceFileNm=${SrceFllPth##*/}
+SrceFllPth=$(readlink -f "${BASH_SOURCE[0]}")                       # get full path of running script
+SrceFolder=$(dirname "$SrceFllPth")                                 # extract directory path from full path
+SrceFileNE=${SrceFllPth##*/}                                        # extract filename and extension from full path
+SrceFileNm=${SrceFileNE%.*}                                         # extract only filename from filename and extension
+
+# RECURRING FUNCTIONS
+
+sanitize_array() {
+  local -n arr=$1
+  shopt -s extglob
+  arr=("${arr[@]/#+([[:blank:]])/}")
+  arr=("${arr[@]/%+([[:blank:]])/}")
+}
+
+query_dns() {
+  local server=$1
+  local domain=$2
+  local time
+  time=$(dig +tries=1 +timeout=1 @"$server" "$domain" | awk '/Query time:/ { print $4 }')
+  [[ -z "$time" ]] && time=1000
+  [[ "$time" -eq 0 ]] && time=1
+  echo "$time"
+}
 
 # BUILD LIST OF NAMESERVERS USED BY THIS HOST
-NAMESERVERS=($(grep ^nameserver /etc/resolv.conf | awk 'BEGIN{i=0}{i++;}{print $2 "#" $1 "/" i}'))
+mapfile -t NAMESERVERS < <(awk '/^nameserver/ {print $2 "#" $1 "/" NR}' /etc/resolv.conf)
 
 # CHECK IF LOCALHOST IS RUNNING DNS ON THE DEFAULT PORT
 if LOCALTEST=$(netstat -tulpnW | grep "\:53\b" | grep "tcp\b" | grep "LISTEN"); then
-# if [ "$?" -eq "0" ]; then
-  LOCALDNS=$(echo "$LOCALTEST" | awk -F '/' 'NR==1{ print $2 }')
-  LOCALHOST=127.0.0.1#"$LOCALDNS"
-  NAMESERVERS=("${LOCALHOST}" "${NAMESERVERS[@]}")
+  LOCALDNS=$(echo "$LOCALTEST" | awk -F '/' '{ gsub(/[ \t]+$/, "", $2); print $2 }' | head -n 1)
+  LOCALDNS="${LOCALDNS:0:14}"
+  LOCALHOST=("127.0.0.1#${LOCALDNS}/I" "127.0.0.1#${LOCALDNS}/C")
+  NAMESERVERS=("${LOCALHOST[@]}" "${NAMESERVERS[@]}")
 fi
+
 # SANITIZE NAMESERVERS ARRAY
-shopt -s extglob                                           # turn on extended glob
-NAMESERVERS=("${NAMESERVERS[@]/#+([[:blank:]])/}")         # remove leading space/tab from each element
-NAMESERVERS=("${NAMESERVERS[@]/%+([[:blank:]])/}")         # remove trailing space/tab from each element
+sanitize_array NAMESERVERS
 
-# BUILD LIST OF IPV4 DNS PROVIDERS
-PROVIDERSV4="
-# NOTABLE IP4 DNS PROVIDERS
-    94.140.14.14#AdGuard/1 
-    94.140.15.15#AdGuard/2
-   185.228.168.9#CleanBrowsing/1 
-   185.228.169.9#CleanBrowsing/2 
-         1.1.1.1#Cloudflare/1
-         1.0.0.1#Cloudflare/2
-      8.26.56.26#Comodo/1
-     8.20.247.20#Comodo/2
-    84.200.69.80#DNS.Watch/1
-    84.200.70.40#DNS.Watch/2
-         8.8.8.8#Google/1 
-         8.8.4.4#Google/2 
-         4.2.2.1#Level3/1 
-         4.2.2.2#Level3/2 
-       64.6.64.6#Neustar/1
-       64.6.65.6#Neustar/2
-  208.67.222.222#OpenDNS/1
-  208.67.220.220#OpenDNS/2
-   216.146.35.35#OracleDyn/1
-   216.146.36.36#OracleDyn/2
-         9.9.9.9#Quad9/1 
- 149.112.112.112#Quad9/2
-
-# OTHER IP4 DNS PROVIDERS
-     76.76.19.19#AlternateDNS/1
-  76.223.122.150#AlternateDNS/2
-       76.76.2.0#ControlD/1
-      76.76.10.0#ControlD/2
-   103.247.36.36#DNSFilter/1
-   103.247.37.37#DNSFilter/2
-     80.80.80.80#Freenom/1
-     80.80.81.81#Freenom/2
-    45.90.28.243#NextDNS/1
-    45.90.30.243#NextDNS/2
-   199.85.126.10#NortonCS/1 
-   199.85.127.10#NortonCS/2 
-    195.46.39.39#SafeDNS/1
-    195.46.39.40#SafeDNS/2
-  91.239.100.100#UncensoredDNS/1
-    89.233.43.71#UncensoredDNS/2
-       64.6.64.6#Verisign/1
-       64.6.65.6#Verisign/2
-       77.88.8.8#Yandex/1 
-       77.88.8.1#Yandex/2
-"
-# SORT PROVIDERSV4 ARRAY
-IFS=$'\n' PROVIDERSV4=($(sort -t "#" -k 2,2 <<<"${PROVIDERSV4[@]}")); unset IFS
+# IMPORT LIST OF IPV4 DNS PROVIDERS
+mapfile -t PROVIDERSV4 < <(sort -t "#" -k 2,2 "$SrceFolder/$SrceFileNm.ipv4.txt")
 
 # BUILD LIST OF IPV6 DNS PROVIDERS
-PROVIDERSV6="
-# NOTABLE IP6 DNS PROVIDERS
-         2a10:50c0::ad1:ff#AdGuard/1-v6
-         2a10:50c0::ad2:ff#AdGuard/2-v6
-            2a0d:2a00:1::2#CleanBrowsing/1-v6
-            2a0d:2a00:2::2#CleanBrowsing/2-v6
-      2606:4700:4700::1111#Cloudflare/1-v6
-      2606:4700:4700::1001#Cloudflare/2-v6
-2001:1608:10:25::1c04:b12f#DNS.Watch/1
-2001:1608:10:25::9249:d69b#DNS.Watch/2
-      2001:4860:4860::8888#Google/1-v6
-      2001:4860:4860::8844#Google/2-v6
-           2620:74:1b::1:1#Neustar/1
-           2620:74:1c::2:2#Neustar/2
-           2620:119:35::35#OpenDNS/1-v6
-           2620:119:53::53#OpenDNS/2-v6
-               2620:fe::fe#Quad9/1-v6
-                2620:fe::9#Quad9/2-v6
-
-# OTHER IP6 DNS PROVIDERS
-             2602:fcbc::ad#AlternateDNS/1-v6
-           2602:fcbc:2::ad#AlternateDNS/2-v6
-               2606:1a40::#ControlD/1-v6
-             2606:1a40:1::#ControlD/2-v6
-        2a07:a8c0::11:b227#NextDNS/1-v6
-        2a07:a8c1::11:b227#NextDNS/2-v6
-       2001:67c:2778::3939#SafeDNS/1-v6
-       2001:67c:2778::3939#SafeDNS/2-v6
-           2001:67c:28a4::#UncensoredDNS/1
-          2a01:3a0:53:53::#UncensoredDNS/2
-        2a02:6b8::feed:0ff#Yandex/1-v6 
-    2a02:6b8:0:1::feed:0ff#Yandex/2-v6
-"
-# SORT PROVIDERSV6 ARRAY
-IFS=$'\n' PROVIDERSV6=($(sort -t "#" -k 2,2 <<<"${PROVIDERSV6[@]}")); unset IFS
+mapfile -t PROVIDERSV6 < <(sort -t "#" -k 2,2 "$SrceFolder/$SrceFileNm.ipv6.txt")
 
 # BUILD LIST OF DOMAINS TO TEST AGAINST
-DOMAINS2TEST="
-# 13 TESTS OR LESS SHOULD FIT WITHIN 80 CHARACTER TERMINAL DISPLAY
-  www.google.com
-  www.youtube.com
-  www.facebook.com
-  www.amazon.com
-  www.reddit.com
-  www.apple.com
-  www.yahoo.com
-  www.wikipedia.org
-  www.twitter.com
-  www.paypal.com
-  docker.io
-  github.com
-  gmail.com
-
-# OTHER TOP/POPULAR WEBSITES TO TEST AGAINST
-# www.bing.com
-# www.fandom.com
-# www.microsoftonline.com
-# www.walmart.com
-# www.duckduckgo.com
-# www.weather.com
-# www.indeed.com
-# www.qccerttest.com
-# www.quora.com
-# www.ebay.com
-# www.cnn.com
-# www.espn.com
-# www.etsy.com
-# www.nytimes.com
-# www.imdb.com
-# www.usps.com
-# www.office.com
-# www.microsoft.com
-# www.zillow.com
-# www.live.com
-# www.plex.tv
-
-# SOCIAL NETWORKING SITES
-# www.instagram.com
-# www.twitch.tv
-# www.tiktok.com
-# www.linkedin.com
-
-# PORN SITES
-# www.pornhub.com
-# www.xvideos.com
-# www.xnxx.com
-# www.spankbang.com
-# www.xhamster.com
-"
-# SORT DOMAINS2TEST ARRAY
-IFS=$'\n' DOMAINS2TEST=($(sort -u <<<"${DOMAINS2TEST[@]}")); unset IFS
+mapfile -t DOMAINS2TEST < <(sort -u "$SrceFolder/$SrceFileNm.domains.txt")
 
 # SANITIZE DOMAINS2TEST ARRAY
-shopt -s extglob                                           # turn on extended glob
-DOMAINS2TEST=("${DOMAINS2TEST[@]/#+([[:blank:]])/}")       # remove leading space/tab from each element
-DOMAINS2TEST=("${DOMAINS2TEST[@]/%+([[:blank:]])/}")       # remove trailing space/tab from each element
+sanitize_array DOMAINS2TEST
 
 if [ "$1" = "ipv6" ]; then
   PROVIDERSTOTEST=("${PROVIDERSV6[@]}")
 elif [ "$1" = "ipv4" ]; then
   PROVIDERSTOTEST=("${PROVIDERSV4[@]}")
 elif [ "$1" = "all" ]; then
-    PROVIDERSTOTEST=("${PROVIDERSV4[@]}" "${PROVIDERSV6[@]}")
+  PROVIDERSTOTEST=("${PROVIDERSV4[@]}" "${PROVIDERSV6[@]}")
 else
   PROVIDERSTOTEST=("${PROVIDERSV4[@]}")
 fi
@@ -211,127 +104,165 @@ elif [ "$1" = "-host" ]; then
 else
   PROVIDERSTOTEST=("${NAMESERVERS[@]}" "${PROVIDERSTOTEST[@]}")
 fi
+
 # SANITIZE NAMESERVERS ARRAY
-shopt -s extglob                                           # turn on extended glob
-PROVIDERSTOTEST=("${PROVIDERSTOTEST[@]/#+([[:blank:]])/}") # remove leading space/tab from each element
-PROVIDERSTOTEST=("${PROVIDERSTOTEST[@]/%+([[:blank:]])/}") # remove trailing space/tab from each element
+sanitize_array PROVIDERSTOTEST
 
 # DETERMINE NAMESERVERS NAME LENGTH ($nsl)
 for item in "${PROVIDERSTOTEST[@]}"; do
-if [[ -n "$item" ]] && [[ ! $item =~ ^#.* ]]; then
-  pname=${item##*#}
-  plength[${#pname}]=${item##*#} # use word length as index
-fi
+  if [[ -n "$item" ]] && [[ ! $item =~ ^#.* ]]; then
+    pname=${item##*#}
+    plength[${#pname}]=${item##*#}                                  # use word length as index
+  fi
 done
-longest=("${plength[@]: -1}")    # select last array element
+longest=("${plength[@]: -1}")                                       # select last array element
 length=$((${#longest}))
-nsl="%-$((${#longest} + 1))s"
+nsl="%-$((${#longest} + 2))s"
 
-echo 
-echo TESTING DOMAINS:
-echo 
-echo Test Domain Name
-echo ---- ---------------
+printf '\n\n%s\n\n' "TESTING DOMAINS ($SrceFileNE.domains)"
+printf '%8s %s\n' "Test#" "Domain Name"
+printf '%8s %s\n' "------" "---------------"
+
 for d in "${DOMAINS2TEST[@]}"; do
-if [[ -n "$d" ]] && [[ ! $d =~ ^#.* ]]; then
-  totaldomains=$((totaldomains + 1))
-  printf "%3s: %s\n" "t$totaldomains" "$d"
-fi
+  if [[ -n "$d" ]] && [[ ! $d =~ ^#.* ]]; then
+    totaldomains=$((totaldomains + 1))
+    printf '%8s %s\n' "t$totaldomains" "$d"
+  fi
 done
 unset totaldomains
 
-echo 
-echo ALPHABETICAL TESTING:
-echo 
+printf '\n\n%s\n\n' "LOCAL THEN ALPHABETICAL BY SERVER ($SrceFileNE.log)"
 
 # REDIRECT STDOUT TO TEE IN ORDER TO DUPLICATE THE OUTPUT TO THE TERMINAL AS WELL AS A .LOG FILE
 exec > >(tee "$SrceFllPth.log")
 
-# totaldomains=0
-eval printf '$nsl' "Provider"
+eval printf '$nsl' "Server"
 for d in "${DOMAINS2TEST[@]}"; do
-if [[ -n "$d" ]] && [[ ! $d =~ ^#.* ]]; then
-  totaldomains=$((totaldomains + 1))
-  printf "%-4s" "t$totaldomains"
-fi
+  if [[ -n "$d" ]] && [[ ! $d =~ ^#.* ]]; then
+    totaldomains=$((totaldomains + 1))
+    printf "%-4s" "t$totaldomains"
+  fi
 done
 printf "%9s\n" "Median ms"
-eval printf -- '-%.0s' "{1..$length}"
+eval printf -- '-%.0s' "{1..$((length + 1))}"
+
 printf ' %.0s' ""
 for d in "${DOMAINS2TEST[@]}"; do
-if [[ -n "$d" ]] && [[ ! $d =~ ^#.* ]]; then
-  printf "%-4s" "---"
-fi
+  if [[ -n "$d" ]] && [[ ! $d =~ ^#.* ]]; then
+    printf "%-4s" "---"
+  fi
 done
 printf "%-4s\n" "---------"
 
 for p in "${PROVIDERSTOTEST[@]}"; do
-if [[ -n "$p" ]] && [[ ! $p =~ ^#.* ]]; then
-
+  if [[ -n "$p" ]] && [[ ! $p =~ ^#.* ]]; then
     pip=${p%%#*}
     pname=${p##*#}
     ftime=0
     xtime=0
-
     eval printf '$nsl' "$pname"
     for d in "${DOMAINS2TEST[@]}"; do
-    if [[ -n "$d" ]] && [[ ! $d =~ ^#.* ]]; then
-
-      ttime=$(dig +tries=1 +timeout=1  @"$pip" "$d" |  grep "Query time:" | awk '{ print $4 }')
-
-
-
-  # NSLOOKUP INSTEAD OF DIG
-      # TEST=$((time (nslookup -timeout=1 -retry=0 www.microsoft.com 89.233.43.71)) 2>&1)
-      # echo "$TEST" | grep "connection timed out"
-      # echo "$TEST" | grep "real"
-
-
-
-      if [ -z "$ttime" ]; then
-  	    #let's have time out be 1s = 1000ms
-  	    ttime=1000
-      elif [ "$ttime" = "0" ]; then
-  	    ttime=1
-  	  fi
-
-      if [ "$ttime" -ge "1000" ]; then
-       printf "%-4s" "*"
-       xtime=$((xtime+1))
-      else
-        printf "%-4s" "$ttime"
+      if [[ -n "$d" ]] && [[ ! $d =~ ^#.* ]]; then
+        ttime=$(dig +tries=1 +timeout=1 @"$pip" "$d" | grep "Query time:" | awk '{ print $4 }')
+        if [ -z "$ttime" ]; then
+          ttime=1000                                                # Default timeout of 1000ms (1 second)
+        elif [ "$ttime" = "0" ]; then
+          ttime=1
+        fi
+        if [ "$ttime" -ge "1000" ]; then
+          printf "%-4s" "*"
+          xtime=$((xtime + 1))
+        else
+          printf "%-4s" "$ttime"
+        fi
+        ftime=$((ftime + ttime))
       fi
-
-      ftime=$((ftime + ttime))
-
-    fi
     done
     avg=$(awk -v a="$ftime" -v b="$totaldomains" 'BEGIN { printf "%.2f", a/b }' </dev/null)
-
-      if [ "$xtime" -gt "0" ]; then
-        printf "%-3s %5s\n" "999" "$xtime-to"
-        unset xtime
+    if [ "$xtime" -gt "0" ]; then
+      if awk -v avg="$avg" 'BEGIN {exit !(avg > 999)}'; then
+        printf "%3s %5s\n" "NR" "$xtime-to"
       else
         printf "%9s\n" "$avg ms"
       fi
-  # sleep 30
+      unset xtime
+    else
+      printf "%9s\n" "$avg ms"
+    fi
   fi
 done
 
 # CLOSE AND NORMALIZE THE LOGGING REDIRECTIONS
-exec > /dev/tty 2>&1
+exec >/dev/tty 2>&1
 
-# SORT THE LOGGED OUTPUT BY FASTEST MEDIAN RESPONSE TIME
-read -r third_line < <(head -n 3 "$SrceFllPth".log | tail -n 1)
+# SUMMARY REPORTS
+header_row=$(head -n 2 "$SrceFllPth.log")                           # Get the reusable results header row
+
+# SORT LOGGED OUTPUT BY FASTEST MEDIAN RESPONSE TIME
+read -r third_line < <(head -n 3 "$SrceFllPth.log" | tail -n 1)
 num_fields=$(echo "$third_line" | awk '{print NF}')
-sort -k "$((num_fields - 1))" -k "$num_fields" -n "$SrceFllPth".log -o "$SrceFllPth".sorted.log
-(tail -n +3 "$SrceFllPth".log | sort -k "$((num_fields - 1))" -k "$num_fields" -n) \
- | cat <(head -n 2 "$SrceFllPth".log) - > "$SrceFllPth".sorted.log
+tail -n +3 "$SrceFllPth.log" | sort -k "$((num_fields - 1))" -k "$num_fields" -n -o "$SrceFllPth.sorted.log"
+{                                                                   # Store the data how we want it presented
+  printf '%s\n' "$header_row"                                       # Print the summary header
+  grep -v "NR" "$SrceFllPth.sorted.log"                             # Print responding servers
+  grep "NR" "$SrceFllPth.sorted.log"                                # Print non-responsing servers
+} >"$SrceFllPth".temp.log && mv "$SrceFllPth".temp.log "$SrceFllPth.sorted.log"
 
-echo 
-echo RESULTS SORTED BY MEDIAN RESPONSE TIME \("$SrceFileNm.sorted.log"\):
+printf '\n\n%s\n\n' "ALL SERVERS BY MEDIAN RESPONSE TIME ($SrceFileNE.sorted.log)"
+cat "$SrceFllPth.sorted.log"
 echo
-cat "$SrceFllPth".sorted.log
-echo 
 
-# exit 0;
+# DISPLAY ONLY TIMEOUT LOGGED OUTPUT IF PRESENT
+timeouts=$(grep "\*" "$SrceFllPth.sorted.log")
+if [[ -n "$timeouts" ]]; then                                       # Check if the variable timeouts is non-empty before printing
+  printf '\n%s\n\n' "RESULTS WITH QUERY TIMEOUTS"
+  printf '%s\n' "$header_row"
+  printf '%s\n' "$timeouts"
+fi
+
+printf '\n%s\n\n' "RESPONDING PROVIDERS BY AVERAGED MEDIAN RESPONSE TIMES"
+
+# AVERAGE VALUES CALCULATION FOR EACH SERVER SET
+declare -A sums counts
+declare -A sums
+declare -A counts
+
+while IFS= read -r line; do                                         # Loop through each line in the sorted log file
+  server_set=$(echo "$line" | awk '{ print $1 }' | sed 's#/.*##')   # Extract the server set name (base name before the '/1', '/2', etc.)
+  second_to_last_num=$(echo "$line" | awk '{ print $(NF-1) }')      # Extract the second-to-last number (this is the median response time)
+  if [[ -n "$second_to_last_num" ]]; then                           # If the extracted number is not empty, process it
+    sums[$server_set]=$(awk -v sum="${sums[$server_set]:-0}" -v num="$second_to_last_num" 'BEGIN { print sum + num }') # Convert to floating-point if necessary
+    if [[ "$second_to_last_num" != "NR" ]]; then
+      counts[$server_set]=$((counts[$server_set] + 1))
+    fi
+  fi
+done < "$SrceFllPth.sorted.log"
+
+sorted_sums=()                                                      # Declare an array to hold the sorted sums
+for server_set in "${!sums[@]}"; do                                 # Collect the averages and server sets
+  if [[ "${counts[$server_set]}" -gt 0 ]]; then
+    avg=$(awk -v sum="${sums[$server_set]}" -v count="${counts[$server_set]}" 'BEGIN { printf "%.2f", sum / count }')
+    if [[ "$avg" != "0.00" ]]; then                                 # Check if avg is not equal to 0.00 before adding to sorted_sums
+      sorted_sums+=("$avg $server_set")                             # Store both avg and server_set into the sorted_sums array
+    fi
+  fi
+done
+
+# Sort the array based on the first column (avg value) numerically
+sorted_output=$(printf '%s\n' "${sorted_sums[@]}" | sort -n)
+
+# Print the sorted results header
+eval printf '$nsl' "Provider"
+printf "%9s %s\n" "Average" "Servers"
+eval printf -- '-%.0s' "{1..$((length + 1))}"
+printf ' %.0s' ""
+printf "%-4s %5s\n" "---------" "-------"
+
+while read -r avg server_set; do
+  eval printf '$nsl' "$server_set"                                  # Print the provider name (server_set) formatted with $nsl
+  printf "%9s " "$avg ms"                                           # Print the avg ms value right after the provider name
+  printf "(%s)" "${counts[$server_set]}"                            # Print the count in parentheses (from ${counts[$server_set]})
+  printf "\n"
+done <<<"$sorted_output"
+
+printf "\n"
