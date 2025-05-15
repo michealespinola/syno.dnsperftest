@@ -1,0 +1,50 @@
+# 13 TESTS OR LESS SHOULD FIT WITHIN 80 CHARACTER TERMINAL DISPLAY
+  www.google.com
+  www.youtube.com
+  www.facebook.com
+  www.amazon.com
+  www.reddit.com
+  www.apple.com
+  www.yahoo.com
+  www.wikipedia.org
+  www.twitter.com
+  www.paypal.com
+  docker.io
+  github.com
+  gmail.com
+
+# OTHER TOP/POPULAR WEBSITES TO TEST AGAINST
+# www.bing.com
+# www.fandom.com
+# www.microsoftonline.com
+# www.walmart.com
+# www.duckduckgo.com
+# www.weather.com
+# www.indeed.com
+# www.qccerttest.com
+# www.quora.com
+# www.ebay.com
+# www.cnn.com
+# www.espn.com
+# www.etsy.com
+# www.nytimes.com
+# www.imdb.com
+# www.usps.com
+# www.office.com
+# www.microsoft.com
+# www.zillow.com
+# www.live.com
+# www.plex.tv
+
+# SOCIAL NETWORKING SITES
+# www.instagram.com
+# www.twitch.tv
+# www.tiktok.com
+# www.linkedin.com
+
+# PORN SITES
+# www.pornhub.com
+# www.xvideos.com
+# www.xnxx.com
+# www.spankbang.com
+# www.xhamster.com

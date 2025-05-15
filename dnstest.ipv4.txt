@@ -1,0 +1,63 @@
+### WELL-KNOWN IP4 DNS PROVIDERS
+    94.140.14.14#AdGuard/1 
+    94.140.15.15#AdGuard/2
+   185.228.168.9#CleanBrowsing/1 
+   185.228.169.9#CleanBrowsing/2 
+         1.1.1.1#Cloudflare/1
+         1.0.0.1#Cloudflare/2
+      8.26.56.26#Comodo/1
+     8.20.247.20#Comodo/2
+         8.8.8.8#Google/1 
+         8.8.4.4#Google/2 
+         4.2.2.1#Level3/1 
+         4.2.2.2#Level3/2 
+       64.6.64.6#Neustar/1
+       64.6.65.6#Neustar/2
+  208.67.222.222#OpenDNS/1
+  208.67.220.220#OpenDNS/2
+   216.146.35.35#OracleDyn/1
+   216.146.36.36#OracleDyn/2
+         9.9.9.9#Quad9/1 
+ 149.112.112.112#Quad9/2
+
+### OTHER IP4 DNS PROVIDERS
+#114.114.114.114#114DNS/1
+#114.114.115.115#114DNS/2
+#      223.5.5.5#AliDNS/1
+#      223.6.6.6#AliDNS/2
+#    76.76.19.19#AlternateDNS/1
+# 76.223.122.150#AlternateDNS/2
+#        1.2.4.8#CNNICSDNS/1
+#      210.2.4.8#CNNICSDNS/2
+#      76.76.2.0#ControlD/1
+#     76.76.10.0#ControlD/2
+#   84.200.69.80#DNS.WATCH/1
+#   84.200.70.40#DNS.WATCH/2
+#  103.247.36.36#DNSFilter/1
+#  103.247.37.37#DNSFilter/2
+#    101.226.4.6#DNSpai/1
+#   218.30.118.6#DNSpai/2
+#   119.29.29.29#DNSPodDNS+/1
+#   119.28.28.28#DNSPodDNS+/2
+#    80.80.80.80#Freenom/1
+#    80.80.81.81#Freenom/2
+#   45.90.28.243#NextDNS/1
+#   45.90.30.243#NextDNS/2
+#  199.85.126.10#NortonCS/1 
+#  199.85.127.10#NortonCS/2 
+#   117.50.11.11#OneDNS/1
+#   117.50.22.22#OneDNS/2
+#   195.46.39.39#SafeDNS/1
+#   195.46.39.40#SafeDNS/2
+#      64.6.64.6#Verisign/1
+#      64.6.65.6#Verisign/2
+#      77.88.8.8#Yandex/1 
+#      77.88.8.1#Yandex/2
+
+### ISP DNS PROVIDERS
+#   205.171.3.65#CenturyLink/1
+#   205.171.2.65#CenturyLink/2
+#  202.97.224.68#ChinaTCL-UNC/1
+#  202.97.224.69#ChinaTCL-UNC/2
+#   168.126.63.1#SKTelecom/1
+#   168.126.63.2#SKTelecom/2

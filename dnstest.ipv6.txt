@@ -1,0 +1,35 @@
+# WELL-KNOWN IP6 DNS PROVIDERS
+          2a10:50c0::ad1:ff#AdGuard/1-v6
+          2a10:50c0::ad2:ff#AdGuard/2-v6
+             2a0d:2a00:1::2#CleanBrowsing/1-v6
+             2a0d:2a00:2::2#CleanBrowsing/2-v6
+       2606:4700:4700::1111#Cloudflare/1-v6
+       2606:4700:4700::1001#Cloudflare/2-v6
+ 2001:1608:10:25::1c04:b12f#DNS.WATCH/1
+ 2001:1608:10:25::9249:d69b#DNS.WATCH/2
+       2001:4860:4860::8888#Google/1-v6
+       2001:4860:4860::8844#Google/2-v6
+            2620:74:1b::1:1#Neustar/1-v6
+            2620:74:1c::2:2#Neustar/2-v6
+            2620:119:35::35#OpenDNS/1-v6
+            2620:119:53::53#OpenDNS/2-v6
+                2620:fe::fe#Quad9/1-v6
+                 2620:fe::9#Quad9/2-v6
+
+# OTHER IP6 DNS PROVIDERS
+              2602:fcbc::ad#AlternateDNS/1-v6
+            2602:fcbc:2::ad#AlternateDNS/2-v6
+                2606:1a40::#ControlD/1-v6
+              2606:1a40:1::#ControlD/2-v6
+         2a07:a8c0::11:b227#NextDNS/1-v6
+         2a07:a8c1::11:b227#NextDNS/2-v6
+            2a05:dfc7:5::53#OpenNIC/1-v6
+         2a05:dfc7:5353::53#OpenNIC/2-v6
+        2001:67c:2778::3939#SafeDNS/1-v6
+        2001:67c:2778::3939#SafeDNS/2-v6
+            2001:67c:28a4::#UncensoredDNS/1-v6
+           2a01:3a0:53:53::#UncensoredDNS/2-v6
+            2620:74:1b::1:1#Verisign/1-v6
+            2620:74:1c::2:2#Verisign/2-v6
+         2a02:6b8::feed:0ff#Yandex/1-v6 
+     2a02:6b8:0:1::feed:0ff#Yandex/2-v6
