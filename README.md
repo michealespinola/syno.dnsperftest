@@ -2,7 +2,7 @@
 
 Shell script to test the performance of the most popular DNS resolvers from your location.
 
-The accompanying ipv4 and ipv6 text file contain the redundant servers of notable DNS providers by default, including:
+The accompanying ipv4 and ipv6 text files contain the redundant servers of notable DNS providers by default, including:
 
 * AdGuard
 * CleanBrowsing 
