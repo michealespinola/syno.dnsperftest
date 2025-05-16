@@ -18,7 +18,7 @@ The accompanying ipv4 and ipv6 text files contain the redundant servers of notab
 * OracleDyn
 * Quad9 (aka 9.9.9.9)
 
-...as well as the redundant servers of these other well-known providers:
+...as well as the redundant servers of these other well-known providers (and many more):
 
 * AlternateDNS
 * ControlD
