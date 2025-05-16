@@ -50,7 +50,7 @@ The accompanying ipv4 and ipv6 text files contain the redundant servers of notab
 # Requirements 
 
 * `dig` needs to be in the PATH. If you don't have it, the script will provide instructions for where to get it.
-* `bc` is no longer a requirement of this script since being forked. `awk` is used instead for greater wide-spread availability - particularly for Synology.
+* `bc` is no longer a requirement of this script since being forked. `awk` is used instead for greater wide-spread availability - particularly for Synology. (this need was what initially prompted the creation of this fork)
 
 # Utilization and example output:
 
