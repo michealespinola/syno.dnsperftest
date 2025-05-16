@@ -7,7 +7,7 @@
 while getopts "::" opt; do
   case ${opt} in
   \?)
-    echo "Usage: $0"
+    printf "Usage: %s\n" "$0"
     exit 1
     ;;
   esac
@@ -59,7 +59,7 @@ query_dns() {
   time=$(dig +tries=1 +timeout=1 @"$server" "$domain" | awk '/Query time:/ { print $4 }')
   [[ -z "$time" ]] && time=1000
   [[ "$time" -eq 0 ]] && time=1
-  echo "$time"
+  printf "%s\n" "$time"
 }
 
 # BUILD LIST OF NAMESERVERS USED BY THIS HOST
@@ -67,7 +67,7 @@ mapfile -t NAMESERVERS < <(awk '/^nameserver/ {print $2 "#" $1 "/" NR}' /etc/res
 
 # CHECK IF LOCALHOST IS RUNNING DNS ON THE DEFAULT PORT
 if LOCALTEST=$(netstat -tulpnW | grep "\:53\b" | grep "tcp\b" | grep "LISTEN"); then
-  LOCALDNS=$(echo "$LOCALTEST" | awk -F '/' '{ gsub(/[ \t]+$/, "", $2); print $2 }' | head -n 1)
+  LOCALDNS=$(awk -F '/' 'NR==1 { sub(/[ \t]+$/, "", $2); print $2; exit }' <<< "$LOCALTEST")
   LOCALDNS="${LOCALDNS:0:14}"
   LOCALHOST=("127.0.0.1#${LOCALDNS}/I" "127.0.0.1#${LOCALDNS}/C")
   NAMESERVERS=("${LOCALHOST[@]}" "${NAMESERVERS[@]}")
@@ -119,22 +119,23 @@ longest=("${plength[@]: -1}")                                       # select las
 length=$((${#longest}))
 nsl="%-$((${#longest} + 2))s"
 
-printf '\n\n%s\n\n' "TESTING DOMAINS ($SrceFileNE.domains)"
+printf '\n\n%s\n\n' "TESTING DOMAINS ($SrceFileNm.domains)"
 printf '%8s %s\n' "Test#" "Domain Name"
 printf '%8s %s\n' "------" "---------------"
 
+domain_index=0
 for d in "${DOMAINS2TEST[@]}"; do
   if [[ -n "$d" ]] && [[ ! $d =~ ^#.* ]]; then
-    totaldomains=$((totaldomains + 1))
-    printf '%8s %s\n' "t$totaldomains" "$d"
+    ((domain_index++))
+    printf '%8s %s\n' "t$domain_index" "$d"
   fi
 done
-unset totaldomains
+unset domain_index
 
-printf '\n\n%s\n\n' "LOCAL THEN ALPHABETICAL BY SERVER ($SrceFileNE.log)"
+printf '\n\n%s\n\n' "LOCAL THEN ALPHABETICAL BY SERVER ($SrceFileNm.log)"
 
 # REDIRECT STDOUT TO TEE IN ORDER TO DUPLICATE THE OUTPUT TO THE TERMINAL AS WELL AS A .LOG FILE
-exec > >(tee "$SrceFllPth.log")
+exec > >(tee "$SrceFolder/$SrceFileNm.log")
 
 eval printf '$nsl' "Server"
 for d in "${DOMAINS2TEST[@]}"; do
@@ -196,24 +197,24 @@ done
 exec >/dev/tty 2>&1
 
 # SUMMARY REPORTS
-header_row=$(head -n 2 "$SrceFllPth.log")                           # Get the reusable results header row
+header_row=$(head -n 2 "$SrceFolder/$SrceFileNm.log")               # Get the reusable results header row
 
 # SORT LOGGED OUTPUT BY FASTEST MEDIAN RESPONSE TIME
-read -r third_line < <(head -n 3 "$SrceFllPth.log" | tail -n 1)
-num_fields=$(echo "$third_line" | awk '{print NF}')
-tail -n +3 "$SrceFllPth.log" | sort -k "$((num_fields - 1))" -k "$num_fields" -n -o "$SrceFllPth.sorted.log"
+read -r third_line < <(head -n 3 "$SrceFolder/$SrceFileNm.log" | tail -n 1)
+num_fields=$(awk '{print NF}' <<< "$third_line")
+tail -n +3 "$SrceFolder/$SrceFileNm.log" | sort -k "$((num_fields - 1))" -k "$num_fields" -n -o "$SrceFolder/$SrceFileNm.sorted.log"
 {                                                                   # Store the data how we want it presented
   printf '%s\n' "$header_row"                                       # Print the summary header
-  grep -v "NR" "$SrceFllPth.sorted.log"                             # Print responding servers
-  grep "NR" "$SrceFllPth.sorted.log"                                # Print non-responsing servers
-} >"$SrceFllPth".temp.log && mv "$SrceFllPth".temp.log "$SrceFllPth.sorted.log"
+  grep -v "NR" "$SrceFolder/$SrceFileNm.sorted.log"                 # Print responding servers
+  grep "NR" "$SrceFolder/$SrceFileNm.sorted.log"                    # Print non-responding servers
+} >"$SrceFolder/$SrceFileNm".temp.log && mv "$SrceFolder/$SrceFileNm".temp.log "$SrceFolder/$SrceFileNm.sorted.log"
 
-printf '\n\n%s\n\n' "ALL SERVERS BY MEDIAN RESPONSE TIME ($SrceFileNE.sorted.log)"
-cat "$SrceFllPth.sorted.log"
-echo
+printf '\n\n%s\n\n' "ALL SERVERS BY MEDIAN RESPONSE TIME ($SrceFileNm.sorted.log)"
+cat "$SrceFolder/$SrceFileNm.sorted.log"
+printf "\n"
 
 # DISPLAY ONLY TIMEOUT LOGGED OUTPUT IF PRESENT
-timeouts=$(grep "\*" "$SrceFllPth.sorted.log")
+timeouts=$(grep "\*" "$SrceFolder/$SrceFileNm.sorted.log")
 if [[ -n "$timeouts" ]]; then                                       # Check if the variable timeouts is non-empty before printing
   printf '\n%s\n\n' "RESULTS WITH QUERY TIMEOUTS"
   printf '%s\n' "$header_row"
@@ -223,20 +224,18 @@ fi
 printf '\n%s\n\n' "RESPONDING PROVIDERS BY AVERAGED MEDIAN RESPONSE TIMES"
 
 # AVERAGE VALUES CALCULATION FOR EACH SERVER SET
-declare -A sums counts
-declare -A sums
-declare -A counts
+declare -A counts sums
 
 while IFS= read -r line; do                                         # Loop through each line in the sorted log file
-  server_set=$(echo "$line" | awk '{ print $1 }' | sed 's#/.*##')   # Extract the server set name (base name before the '/1', '/2', etc.)
-  second_to_last_num=$(echo "$line" | awk '{ print $(NF-1) }')      # Extract the second-to-last number (this is the median response time)
+  server_set=$(awk '{ sub(/\/.*/, "", $1); print $1 }' <<< "$line") # Extract the server set name (base name before the '/1', '/2', etc.)
+  second_to_last_num=$(awk '{ print $(NF-1) }' <<< "$line")         # Extract the second-to-last number (this is the median response time)
   if [[ -n "$second_to_last_num" ]]; then                           # If the extracted number is not empty, process it
     sums[$server_set]=$(awk -v sum="${sums[$server_set]:-0}" -v num="$second_to_last_num" 'BEGIN { print sum + num }') # Convert to floating-point if necessary
     if [[ "$second_to_last_num" != "NR" ]]; then
       counts[$server_set]=$((counts[$server_set] + 1))
     fi
   fi
-done < "$SrceFllPth.sorted.log"
+done < "$SrceFolder/$SrceFileNm.sorted.log"
 
 sorted_sums=()                                                      # Declare an array to hold the sorted sums
 for server_set in "${!sums[@]}"; do                                 # Collect the averages and server sets
@@ -248,11 +247,8 @@ for server_set in "${!sums[@]}"; do                                 # Collect th
   fi
 done
 
-# Sort the array based on the first column (avg value) numerically
-sorted_output=$(printf '%s\n' "${sorted_sums[@]}" | sort -n)
-
-# Print the sorted results header
-eval printf '$nsl' "Provider"
+sorted_output=$(printf '%s\n' "${sorted_sums[@]}" | sort -n)        # Sort the array based on the first column (avg value) numerically
+eval printf '$nsl' "Provider"                                       # Print the sorted results header
 printf "%9s %s\n" "Average" "Servers"
 eval printf -- '-%.0s' "{1..$((length + 1))}"
 printf ' %.0s' ""
