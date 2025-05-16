@@ -1,3 +1,5 @@
+*Note: This script is a majorly overhauled fork.*
+
 # DNS Performance Test
 
 Shell script to test the performance of the most popular DNS resolvers from your location.
