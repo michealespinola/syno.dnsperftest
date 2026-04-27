@@ -43,7 +43,17 @@ SrceFolder=$(dirname "$SrceFllPth")                                 # extract di
 SrceFileNE=${SrceFllPth##*/}                                        # extract filename and extension from full path
 SrceFileNm=${SrceFileNE%.*}                                         # extract only filename from filename and extension
 
+
+
 # RECURRING FUNCTIONS
+
+reload_dns() {
+  if [[ -f "${SrceFolder}/dnsreload.sh" ]]; then
+    bash "${SrceFolder}/dnsreload.sh"
+  else
+    printf "\n%s\n\n" "* dnsreload.sh not found. Skipping DNS cache clearing step.."
+  fi
+}
 
 sanitize_array() {
   local -n arr=$1
@@ -52,15 +62,8 @@ sanitize_array() {
   arr=("${arr[@]/%+([[:blank:]])/}")
 }
 
-query_dns() {
-  local server=$1
-  local domain=$2
-  local time
-  time=$(dig +tries=1 +timeout=1 @"$server" "$domain" | awk '/Query time:/ { print $4 }')
-  [[ -z "$time" ]] && time=1000
-  [[ "$time" -eq 0 ]] && time=1
-  printf "%s\n" "$time"
-}
+# RELOAD DNS SERVICES TO CLEAR CACHES
+reload_dns
 
 # BUILD LIST OF NAMESERVERS USED BY THIS HOST
 mapfile -t NAMESERVERS < <(awk '/^nameserver/ {print $2 "#" $1 "/" NR}' /etc/resolv.conf)
@@ -218,24 +221,55 @@ timeouts=$(grep "\*" "$SrceFolder/$SrceFileNm.sorted.log")
 if [[ -n "$timeouts" ]]; then                                       # Check if the variable timeouts is non-empty before printing
   printf '\n%s\n\n' "RESULTS WITH QUERY TIMEOUTS"
   printf '%s\n' "$header_row"
-  printf '%s\n' "$timeouts"
+  printf '%s\n\n' "$timeouts"
 fi
 
 printf '\n%s\n\n' "RESPONDING PROVIDERS BY AVERAGED MEDIAN RESPONSE TIMES"
 
+### # AVERAGE VALUES CALCULATION FOR EACH SERVER SET
+### declare -A counts sums
 # AVERAGE VALUES CALCULATION FOR EACH SERVER SET
 declare -A counts sums
+declare -A name_to_ip     # "Cloudflare/1"                  -> "1.1.1.1"
+declare -A responded      # "Cloudflare/1"                  -> 1 if it responded
+declare -A prov_ips       # "Cloudflare/1 Cloudflare/2"     -> "1.1.1.1 1.0.0.1" (space-separated unique list)
 
-while IFS= read -r line; do                                         # Loop through each line in the sorted log file
-  server_set=$(awk '{ sub(/\/.*/, "", $1); print $1 }' <<< "$line") # Extract the server set name (base name before the '/1', '/2', etc.)
-  second_to_last_num=$(awk '{ print $(NF-1) }' <<< "$line")         # Extract the second-to-last number (this is the median response time)
-  if [[ -n "$second_to_last_num" ]]; then                           # If the extracted number is not empty, process it
-    sums[$server_set]=$(awk -v sum="${sums[$server_set]:-0}" -v num="$second_to_last_num" 'BEGIN { print sum + num }') # Convert to floating-point if necessary
+
+# Build name->IP map from the configured providers
+for p in "${PROVIDERSTOTEST[@]}"; do
+  [[ -n "$p" && ! "$p" =~ ^# ]] || continue
+  ip=${p%%#*}
+  name=${p##*#}           # e.g., "Cloudflare/1"
+  name_to_ip["$name"]="$ip"
+done
+
+
+
+### while IFS= read -r line; do                                         # Loop through each line in the sorted log file
+###   server_set=$(awk '{ sub(/\/.*/, "", $1); print $1 }' <<< "$line") # Extract the server set name (base name before the '/1', '/2', etc.)
+###   second_to_last_num=$(awk '{ print $(NF-1) }' <<< "$line")         # Extract the second-to-last number (this is the median response time)
+###   if [[ -n "$second_to_last_num" ]]; then                           # If the extracted number is not empty, process it
+###     sums[$server_set]=$(awk -v sum="${sums[$server_set]:-0}" -v num="$second_to_last_num" 'BEGIN { print sum + num }') # Convert to floating-point if necessary
+###     if [[ "$second_to_last_num" != "NR" ]]; then
+###       counts[$server_set]=$((counts[$server_set] + 1))
+###     fi
+###   fi
+### done < "$SrceFolder/$SrceFileNm.sorted.log"
+while IFS= read -r line; do
+  full_name=$(awk '{print $1}' <<< "$line")        # e.g., "Cloudflare/1"
+  server_set=${full_name%%/*}                      # "Cloudflare"
+  second_to_last_num=$(awk '{ print $(NF-1) }' <<< "$line")
+
+  if [[ -n "$second_to_last_num" ]]; then
+    sums[$server_set]=$(awk -v sum="${sums[$server_set]:-0}" -v num="$second_to_last_num" 'BEGIN { print sum + num }')
     if [[ "$second_to_last_num" != "NR" ]]; then
       counts[$server_set]=$((counts[$server_set] + 1))
+      responded["$full_name"]=1                   # mark member as responded
     fi
   fi
 done < "$SrceFolder/$SrceFileNm.sorted.log"
+
+
 
 sorted_sums=()                                                      # Declare an array to hold the sorted sums
 for server_set in "${!sums[@]}"; do                                 # Collect the averages and server sets
@@ -254,10 +288,32 @@ eval printf -- '-%.0s' "{1..$((length + 1))}"
 printf ' %.0s' ""
 printf "%-4s %5s\n" "---------" "-------"
 
+### while read -r avg server_set; do
+###   eval printf '$nsl' "$server_set"       
+###   printf "%9s " "$avg ms"                
+###   printf "(%s)" "${counts[$server_set]}"  
+###   printf "\n"
+### done <<<"$sorted_output"
 while read -r avg server_set; do
   eval printf '$nsl' "$server_set"                                  # Print the provider name (server_set) formatted with $nsl
   printf "%9s " "$avg ms"                                           # Print the avg ms value right after the provider name
   printf "(%s)" "${counts[$server_set]}"                            # Print the count in parentheses (from ${counts[$server_set]})
+
+  # Build ordered member list like Cloudflare/1, Cloudflare/2
+  members=$(printf '%s\n' "${!name_to_ip[@]}" \
+            | awk -v p="$server_set/" 'index($0,p)==1' \
+            | sort -t/ -k2,2n)
+
+  # Filter to responders and map to IPs, preserving 1,2,3... order
+  ips_csv=""
+  while IFS= read -r m; do
+    [[ -n "${responded[$m]}" ]] || continue
+    ip="${name_to_ip[$m]}"
+    [[ -n "$ip" ]] || continue
+    if [[ -z "$ips_csv" ]]; then ips_csv="$ip"; else ips_csv="$ips_csv, $ip"; fi
+  done <<< "$members"
+
+  [[ -n "$ips_csv" ]] && printf " %s" "$ips_csv"
   printf "\n"
 done <<<"$sorted_output"
 
