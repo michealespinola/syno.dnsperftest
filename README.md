@@ -1,4 +1,4 @@
-*Note: This script is a majorly overhauled fork.*
+*Note: This script is a majorly overhauled fork. IPv6 processing is currently incomplete.*
 
 # DNS Performance Test
 
