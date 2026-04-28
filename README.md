@@ -55,7 +55,7 @@ The accompanying ipv4 and ipv6 text files contain the redundant servers of notab
 # Utilization and example output:
 
 ```
-bash /volume1/homes/admin/scripts/bash/dnstest.sh
+# bash /volume1/homes/admin/scripts/bash/dnstest.sh
 
 CHECKING FOR LOCAL DNS SERVER AND FLUSHING CACHE
 
